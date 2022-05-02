@@ -28,4 +28,8 @@ public class CourseVO {
     private String examScore;
     private String totalScore;
     private String type;
+    /**
+     * 状态，标识是否已选，0未选 1已选
+     */
+    private Integer status;
 }

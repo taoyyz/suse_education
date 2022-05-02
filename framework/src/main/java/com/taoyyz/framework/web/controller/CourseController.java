@@ -25,7 +25,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -62,6 +61,9 @@ public class CourseController {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * 获取选修课程列表
+     */
     @GetMapping("listSelectable/{currentPage}/{pageSize}")
     public Result ListElectiveCourse(@PathVariable Integer currentPage, @PathVariable Integer pageSize) throws JsonProcessingException {
         String courseListString = redisUtil.get("course:list");
@@ -75,6 +77,22 @@ public class CourseController {
             return Result.success(Collections.emptyList());
         }
 
+        //检查当前用户的已选课程id
+        Map<Object, Object> selected = redisUtil.hGetAll("course:select:hash");
+        Long userId = userInfoUtil.getUserId();
+        Set<Long> selectedCourseIds;
+        if (!selected.isEmpty()) {
+            //获取当前用户已选课程的id
+            selectedCourseIds = selected.keySet()
+                    .stream()
+                    .map(o -> (String) o)
+                    .filter(str -> str.endsWith("uid:" + userId))
+                    .map(str -> Long.valueOf(str.substring("course:id:".length(), str.lastIndexOf(":uid"))))
+                    .collect(Collectors.toSet());
+        } else {
+            selectedCourseIds = Collections.emptySet();
+        }
+
         //处理已选人数
         List<String> courseIds = courseVOList.stream()
                 .map(courseVO -> "course:id:" + courseVO.getCourseId())
@@ -84,22 +102,39 @@ public class CourseController {
                 .map(Integer::valueOf)
                 .collect(Collectors.toList());
         for (int i = 0; i < courseVOList.size(); i++) {
-            courseVOList.get(i).setSelectedCount(courseVOList.get(i).getMaxCount() - selectedCountList.get(i));
+            //避免redis中数量为负数时造成的已选课人数大于课程容量情况
+            CourseVO courseVO = courseVOList.get(i);
+            int selectedCount = courseVO.getMaxCount() - selectedCountList.get(i);
+            courseVO.setSelectedCount(selectedCount > courseVO.getMaxCount() ? courseVO.getMaxCount() : selectedCount);
+            courseVO.setStatus(selectedCourseIds.contains(courseVO.getCourseId()) ? 1 : 0);
         }
 
         //排序，未满在前
         courseVOList.sort((prev, next) -> {
             int prevIdle = prev.getMaxCount() - prev.getSelectedCount();
             int nextIdle = next.getMaxCount() - next.getSelectedCount();
-            return nextIdle - prevIdle;
+            int diff = nextIdle - prevIdle;
+            //如果diff为0，即要比较的两个课程的剩余课程容量相同，则优先排可退选课程（已选课程）
+            if (diff == 0) {
+                //如果包含prev，返回负值表示视为prev为小的那个
+                if (selectedCourseIds.contains(prev.getCourseId())) {
+                    return -1;
+                }
+            }
+            return diff;
         });
 
         //手动处理分页
-        return Result.success(courseVOList).put("total", courseVOList.size());
+        int startIndex = (currentPage - 1) * pageSize;
+        courseVOList = courseVOList.stream()
+                .skip(startIndex)
+                .limit(pageSize)
+                .collect(Collectors.toList());
+        return Result.success(courseVOList).put("total", courseIds.size());
     }
 
     /**
-     * 学生选课
+     * 选课接口，仅对于选课期间有效
      */
     @PutMapping("{courseId}")
     public Result selectCourse(@PathVariable String courseId) {
@@ -116,7 +151,7 @@ public class CourseController {
 
         //检查当前用户是否已选过指定课程
         String selected = (String) redisUtil.hGet("course:select:hash", "course:id:" + courseId + ":uid:" + userId);
-        System.out.println("用户 " + userId + " 选了 " + courseId + " -> " + selected);
+        log.debug("用户 " + userId + " 选了 " + courseId + " -> " + selected);
         if ("true".equals(selected)) {
             return Result.error("您已选过了");
         }
@@ -137,7 +172,7 @@ public class CourseController {
     }
 
     /**
-     * 取消选课，仅对于选课期间有效。
+     * 取消选课接口，仅对于选课期间有效。
      */
     @PutMapping("reBack/{courseId}")
     public Result reBack(@PathVariable String courseId) throws InterruptedException {
@@ -459,7 +494,7 @@ public class CourseController {
     /**
      * 每隔5分钟从数据库读取即将开选的课程，缓存到redis
      */
-    @Scheduled(fixedDelay = 300_000L)
+//    @Scheduled(fixedDelay = 300_000L)
     @PutMapping("refresh")
     public void autoCacheCourse() throws JsonProcessingException {
         //判断选课开始时间是否接近5分钟
