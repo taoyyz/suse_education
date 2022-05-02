@@ -1,0 +1,72 @@
+server:
+  port: 9000
+  servlet:
+    context-path: /suse
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/suse_education?useSSL=false
+    username: root
+    password: 199988
+    driver-class-name: com.mysql.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+  mvc:
+    view:
+      # 小心springcloud里springmvc抽风，首先明确只能访问static下的页面，
+      # 并且需要配置默认访问前缀为/根路径，否则访问路径就要是/开头。例如static下的index.html
+      # 不配置前缀和后缀的情况下需要以/index.html访问，配置了.html后缀后可以以/index访问，配置了/前缀后直接以index访问
+      suffix: ".html" #配置视图默认后缀
+      prefix: "/"
+    static-path-pattern: "**/**"
+  redis:
+    port: 6379
+    host: localhost
+    database: 2
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 100
+    redisson:
+      file: classpath:redisson.yml
+logging:
+  level:
+    com:
+      taoyyz:
+        framework: debug
+  pattern:
+    dateformat: yyyy-MM-dd HH:mm:ss
+jwt:
+  token:
+    secret-key: tjj_yyds #密钥
+    expiration: 86400 #token最大生存时间
+    path-patterns: /**
+    excludePathPatterns:
+      - /
+      - /index.html
+      - /error
+      - /swagger-ui.html
+      - /docs
+      - /doc.html
+      - /swagger-resources/**
+      - /webjars/**
+      - /v2/api-docs
+      - /csrf
+      - /v2/api-docs-ext
+      - /null/swagger-resources/**
+      - /user/**
+      - /class/**
+#      - /course/**
+# JMeter generated Header file
+#  Content-Type  application/json
+#  token	eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiLlsI_njosiLCJjcmVhdGVkIjoxNjQ5MDA3ODkyMTAzLCJleHAiOjE2NDkwOTQyOTYsImp0aSI6MTIzfQ.Fv09YYP76tLQGAV-myHQXEz06ZhMtN0LsZSk8QBawMDzVZy1ysr7SBRgA_2KoJMHGHy9tgnz6Al_u4P2kopQqQ
+mybatis-plus:
+  type-aliases-package: com.taoyyz.framework.web.model
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDel
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+  check-config-location: false
+  mapper-locations: classpath*:mapper/**/*Mapper.xml

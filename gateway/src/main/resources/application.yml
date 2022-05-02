@@ -1,0 +1,51 @@
+server:
+  port: 10010
+logging:
+  level:
+    com:
+      taoyyz: debug
+  pattern:
+    dateformat: MM-dd HH:mm:ss:SSS
+ribbon:
+  ServerListRefreshInterval: 1000 #ribbon拉取nacos最新实例状态间隔
+  ConnectTimeout: 5000
+  ReadTimeout: 5000
+  OkToRetryOnAllOperations: false #是否所有操作都重试
+  ribbon.MaxAutoRetries: 2 #同一台实例最大重试次数,不包括首次调用
+  ribbon.MaxAutoRetriesNextServer: 0 #重试负载均衡其他的实例最大重试次数,不包括首次调用
+  eager-load:
+    enabled: true
+    clients:
+      - education
+spring:
+  application:
+    name: gateway
+  cloud:
+    nacos:
+      server-addr: 120.79.141.53:8848 # nacos地址
+      discovery:
+        ip: localhost
+        metadata:
+          preserved.heart.beat.interval: 1000 #心跳发送间隔
+          preserved.heart.beat.timeout: 2000 #不发送心跳时状态健康到不健康超时时间
+          preserved.ip.delete.timeout: 2000 #删除该实例超时时间
+    gateway:
+      routes:
+        - id: education # 路由标示，必须唯一
+          uri: lb://education # 路由的目标地址
+          predicates: # 路由断言，判断请求是否符合规则
+            - Path=/suse/** # 路径断言，判断路径是否是以/suse/**开头，如果是则符合
+      globalcors: # 全局的跨域处理
+        add-to-simple-url-handler-mapping: true # 解决options请求被拦截问题
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"# 允许哪些网站的跨域请求
+            allowedMethods: # 允许的跨域ajax的请求方式
+              - "GET"
+              - "POST"
+              - "PUT"
+              - "DELETE"
+              - "OPTIONS"
+            allowedHeaders: "*" # 允许在请求中携带的头信息
+            allowCredentials: true # 是否允许携带cookie
+            maxAge: 360000 # 这次跨域检测的有效期

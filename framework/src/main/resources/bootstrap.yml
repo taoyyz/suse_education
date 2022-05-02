@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: education #服务名
+  profiles:
+    active: dev # 环境
+  cloud:
+    nacos:
+      server-addr: 120.79.141.53:8848 # nacos地址
+      config:
+        file-extension: yaml # 文件后缀名
+      discovery:
+        ip: localhost
+        metadata:
+          preserved.heart.beat.interval: 1000 #心跳发送间隔
+          preserved.heart.beat.timeout: 2000 #不发送心跳时状态健康到不健康超时时间
+          preserved.ip.delete.timeout: 2000 #删除该实例超时时间
