@@ -3,6 +3,9 @@ package com.taoyyz.framework.web.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.taoyyz.framework.web.model.entity.Department;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * @author taoyyz(陶俊杰)
@@ -11,4 +14,6 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface DepartmentMapper extends BaseMapper<Department> {
+    @Select("select * from department")
+    List<Department> listAll();
 }

@@ -1,20 +1,25 @@
 package com.taoyyz.framework.web.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.pagehelper.PageInfo;
 import com.taoyyz.framework.common.Result;
+import com.taoyyz.framework.common.utils.CourseTimeConverter;
 import com.taoyyz.framework.common.utils.LocalDateTimeUtil;
 import com.taoyyz.framework.common.utils.RedisUtil;
-import com.taoyyz.framework.common.utils.TimeConverter;
 import com.taoyyz.framework.common.utils.UserInfoUtil;
+import com.taoyyz.framework.web.model.DTO.CourseDTO;
+import com.taoyyz.framework.web.model.DTO.CourseScoreDTO;
+import com.taoyyz.framework.web.model.VO.CourseVO;
+import com.taoyyz.framework.web.model.VO.ScheduleVO;
+import com.taoyyz.framework.web.model.VO.UserVO;
 import com.taoyyz.framework.web.model.entity.Course;
 import com.taoyyz.framework.web.model.entity.CourseSelect;
 import com.taoyyz.framework.web.model.entity.User;
-import com.taoyyz.framework.web.model.vo.CourseVO;
-import com.taoyyz.framework.web.model.vo.ScheduleVO;
-import com.taoyyz.framework.web.model.vo.UserVO;
+import com.taoyyz.framework.web.model.request.ScoreRequest;
 import com.taoyyz.framework.web.service.CourseSelectService;
 import com.taoyyz.framework.web.service.CourseService;
 import com.taoyyz.framework.web.service.UserService;
@@ -25,6 +30,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -213,7 +219,7 @@ public class CourseController {
      * 获取当前学生的课程表
      */
     @GetMapping("schedule")
-    public Result getSchedule() {
+    public Result getStudentSchedule() {
         long userId = userInfoUtil.getUserId();
         //获取mysql中的所有选课记录
         Set<Long> courseIdsInMySQL = courseSelectService.list(Wrappers.lambdaQuery(CourseSelect.class)
@@ -259,10 +265,69 @@ public class CourseController {
     }
 
     /**
+     * 获取当前老师的课程表
+     */
+    @GetMapping("teacher/schedule")
+    public Result getTeacherSchedule() {
+        UserVO userVO = userInfoUtil.getUserVO();
+        //查询当前老师开设的课程列表
+        List<Course> courseList = courseService.list(Wrappers.lambdaQuery(Course.class)
+                .eq(Course::getCreatorId, userVO.getUserId()));
+        //包装为课程表VO对象
+        List<ScheduleVO> scheduleVOList = new ArrayList<>(courseList.size());
+        courseList.forEach(course -> {
+            ScheduleVO scheduleVO = new ScheduleVO();
+            scheduleVO.setCourseName(course.getCourseName());
+            scheduleVO.setTeacherName(userVO.getUsername());
+            scheduleVO.setLocation(course.getCourseLocation());
+            scheduleVO.setTime(course.getCourseTime());
+            scheduleVOList.add(scheduleVO);
+        });
+        return Result.success(scheduleVOList);
+    }
+
+    @GetMapping("teacher/scoreList/{currentPage}/{pageSize}")
+    public Result listScoreList(@PathVariable Integer currentPage,
+                                @PathVariable Integer pageSize,
+                                @RequestParam(required = false) String keyword,
+                                @RequestParam(required = false) Long courseId) {
+        PageInfo<CourseScoreDTO> courseScoreDTOPageInfo = courseService.listScoreList(currentPage, pageSize, keyword, courseId);
+        return Result.success(courseScoreDTOPageInfo.getList()).put("total", courseScoreDTOPageInfo.getTotal());
+    }
+
+    @GetMapping("teacher/listAll")
+    public Result listAll() {
+        List<Course> courseList = courseService.list(Wrappers.lambdaQuery(Course.class)
+                .eq(Course::getCreatorId, userInfoUtil.getUserId()));
+        if (courseList.isEmpty()) {
+            return Result.success(Collections.emptyList());
+        }
+
+        List<CourseDTO> courseDTOList = new ArrayList<>();
+        courseList.forEach(course -> {
+            CourseDTO courseDTO = new CourseDTO().setCourseId(course.getCourseId()).setCourseName(course.getCourseName());
+            courseDTOList.add(courseDTO);
+        });
+        return Result.success(courseDTOList);
+    }
+
+    @GetMapping("teacher/score/{tbId}")
+    public Result getScore(@PathVariable Long tbId) {
+        CourseSelect courseSelect = courseService.getScoreById(tbId);
+        return Result.success(courseSelect);
+    }
+
+    @PutMapping("teacher/score")
+    public Result setScore(@RequestBody @Validated ScoreRequest scoreRequest) {
+        boolean success = courseService.updateScore(scoreRequest);
+        return success ? Result.success() : Result.error("设置分数失败");
+    }
+
+    /**
      * 分页获取当前用户的课程列表
      */
     @GetMapping("list/{currentPage}/{pageSize}")
-    public Result listCourse(@PathVariable Integer currentPage, @PathVariable Integer pageSize) {
+    public Result listStudentCourse(@PathVariable Integer currentPage, @PathVariable Integer pageSize) {
         UserVO userVO = userInfoUtil.getUserVO();
         //获取用户选课详情
         Set<Object> keys = redisUtil.hKeys("course:select:hash");
@@ -331,6 +396,49 @@ public class CourseController {
         }
         return Result.success(courseVOList).put("total", count);
         //TODO 优先显示可退订的选课详情，也就是选课还没结束的，SQL查询时LIMIT start,size + 可退订数量，保持可退订课程在已选课列表最前面
+    }
+
+    /**
+     * 分页获取当前老师的授课列表
+     */
+    @GetMapping("teacher/list/{currentPage}/{pageSize}")
+    public Result listTeacherCourse(@PathVariable Integer currentPage, @PathVariable Integer pageSize) {
+        //分页获取当前老师发布的课程列表
+        Page<Course> page = courseService.page(new Page<>(currentPage, pageSize), Wrappers.lambdaQuery(Course.class)
+                .eq(Course::getCreatorId, userInfoUtil.getUserId()));
+        if (page.getRecords().isEmpty()) {
+            return Result.success(page);
+        }
+
+        //所有选修课的课程id
+        List<Long> electivesIds = page.getRecords()
+                .stream()
+                .filter(course -> course.getType().equals(0))
+                .map(Course::getCourseId)
+                .collect(Collectors.toList());
+        //选修课程id和剩余容量计数
+        Map<Long, Integer> electivesIdToCount = new HashMap<>();
+        electivesIds.forEach(courseId -> {
+            String countString = redisUtil.get("course:id:" + courseId);
+            if (countString == null) {
+                //表示这个课程的剩余容量不在redis里
+                electivesIdToCount.put(courseId, null);
+            } else {
+                int count = Integer.parseInt(countString);
+                electivesIdToCount.put(courseId, Math.max(count, 0));
+            }
+        });
+
+        //设置上课时间的字符串格式
+        page.getRecords().forEach(course -> {
+            course.setCourseTime(CourseTimeConverter.covertTimePart(course.getCourseTime()));
+            Integer count = electivesIdToCount.get(course.getCourseId());
+            if (count != null) {
+                //已选课程人数 = 总容量 - 剩余容量
+                course.setSelectedCount(course.getMaxCount() - count);
+            }
+        });
+        return Result.success(page);
     }
 
     @PutMapping("{courseId}/{num}")
@@ -416,10 +524,6 @@ public class CourseController {
 
     /**
      * 设置课程的已选人数
-     *
-     * @param userId
-     * @param keys
-     * @param courseList
      */
     private List<CourseVO> populateField(Long userId, Set<Object> keys, List<Course> courseList) {
         //检查是否已过选课时间
@@ -453,7 +557,7 @@ public class CourseController {
                     .filter(s -> s.substring("course:id:".length(), s.lastIndexOf(":uid")).equals(String.valueOf(courseId)))
                     .count();
             courseVO.setSelectedCount(count == 0 ? course.getSelectedCount() : (int) count);
-            courseVO.setCourseTime(TimeConverter.covertTimePart(course.getCourseTime()));
+            courseVO.setCourseTime(CourseTimeConverter.covertTimePart(course.getCourseTime()));
             courseVO.setCreatorName(userIdToName.get(course.getCreatorId()));
             CourseSelect courseSelect = courseIdToCourseSelect.get(course.getCourseId());
             courseVO.setDailyScore(courseSelect == null ? "-" : courseSelect.getDailyScore());
@@ -535,7 +639,7 @@ public class CourseController {
             CourseVO courseVO = new CourseVO();
             BeanUtils.copyProperties(course, courseVO);
             courseVO.setCreatorName(userIdToName.get(courseIdToCreatorId.get(course.getCourseId())));
-            courseVO.setCourseTime(TimeConverter.covertTimePart(course.getCourseTime()));
+            courseVO.setCourseTime(CourseTimeConverter.covertTimePart(course.getCourseTime()));
             courseVOList.add(courseVO);
         });
     }

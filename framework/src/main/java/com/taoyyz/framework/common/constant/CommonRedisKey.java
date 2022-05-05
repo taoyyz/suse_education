@@ -27,4 +27,7 @@ public interface CommonRedisKey {
     String NEWS_KEY = "news";
     String DEPARTMENT_MAP_KEY = "department:map";
     String MAJOR_MAP_KEY = "major:map";
+
+    String CLASS_MAP_KEY = "class:map";
+    String LOCK_CLASS_NAME = "class:name:";
 }

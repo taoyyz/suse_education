@@ -1,8 +1,12 @@
 package com.taoyyz.framework.web.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.taoyyz.framework.web.model.DTO.CourseScoreDTO;
 import com.taoyyz.framework.web.model.entity.Course;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * @author taoyyz(陶俊杰)
@@ -11,4 +15,5 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface CourseMapper extends BaseMapper<Course> {
+    List<CourseScoreDTO> selectScoreList(@Param("userId") Long userId, @Param("keyword") String keyword, @Param("courseId") Long courseId);
 }

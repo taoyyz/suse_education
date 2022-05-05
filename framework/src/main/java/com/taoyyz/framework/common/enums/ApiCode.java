@@ -12,7 +12,8 @@ public enum ApiCode {
     OK(200, "操作成功"),
     ERROR(500, "操作失败"),
     UN_LOGIN(503, "未登录"),
-    LOGIN_EXPIRED(504, "登录已过期");
+    LOGIN_EXPIRED(504, "登录已过期"),
+    NO_LOCK(505, "操作失败，请重试");
 
     private final Integer code;
     private final String message;

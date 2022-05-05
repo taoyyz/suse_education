@@ -24,6 +24,9 @@ public class Course {
     private Integer maxCount;
     private String examDateTime;
     private String examLocation;
+    /**
+     * 0选修1必修
+     */
     private Integer type;
     @TableLogic
     private Integer isDel;

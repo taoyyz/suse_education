@@ -15,6 +15,6 @@ public class Major {
     @TableId
     private Long majorId;
     private String majorName;
-    private String departmentId;
+    private Long departmentId;
     private Integer isDel;
 }

@@ -10,13 +10,16 @@ import com.taoyyz.framework.common.constant.CommonRedisKey;
 import com.taoyyz.framework.common.utils.JwtTokenUtil;
 import com.taoyyz.framework.common.utils.RedisUtil;
 import com.taoyyz.framework.common.utils.UserInfoUtil;
+import com.taoyyz.framework.web.controller.ClazzController;
 import com.taoyyz.framework.web.controller.DepartmentController;
 import com.taoyyz.framework.web.controller.MajorController;
 import com.taoyyz.framework.web.mapper.UserMapper;
+import com.taoyyz.framework.web.model.VO.UserVO;
+import com.taoyyz.framework.web.model.entity.Clazz;
+import com.taoyyz.framework.web.model.entity.Major;
 import com.taoyyz.framework.web.model.entity.User;
 import com.taoyyz.framework.web.model.request.UserLoginRequest;
 import com.taoyyz.framework.web.model.request.UserUpdate;
-import com.taoyyz.framework.web.model.vo.UserVO;
 import com.taoyyz.framework.web.service.UserService;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
@@ -25,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -50,6 +54,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private DepartmentController departmentController;
     @Autowired
     private MajorController majorController;
+    @Autowired
+    private ClazzController clazzController;
 
     @Override
     public Result login(UserLoginRequest userLoginRequest) throws JsonProcessingException {
@@ -76,8 +82,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         BeanUtils.copyProperties(user, userVO);
         //获得学院、专业、班级名称
         userVO.setDepartmentName(departmentController.getIdToDepartment().get(user.getDepartmentId()).getDepartmentName());
-        userVO.setMajorName(majorController.getIdToMajor().get(user.getMajorId()).getMajorName());
-//        userVO.setClazzName()
+        Optional<Major> major = Optional.ofNullable(majorController.getIdToMajor().get(user.getMajorId()));
+        userVO.setMajorName(major.map(Major::getMajorName).orElse(""));
+        Optional<Clazz> clazz = Optional.ofNullable(clazzController.getIdToClazz().get(user.getClazzId()));
+        userVO.setClazzName(clazz.map(Clazz::getClassName).orElse(""));
         String userString;
         try {
             userString = objectMapper.writeValueAsString(userVO);

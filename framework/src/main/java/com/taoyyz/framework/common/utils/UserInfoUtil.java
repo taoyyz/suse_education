@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taoyyz.framework.common.constant.CommonRedisKey;
 import com.taoyyz.framework.common.enums.ApiCode;
 import com.taoyyz.framework.common.exception.UserInfoException;
-import com.taoyyz.framework.web.model.vo.UserVO;
+import com.taoyyz.framework.web.model.VO.UserVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

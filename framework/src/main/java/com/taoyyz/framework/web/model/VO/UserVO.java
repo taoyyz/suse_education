@@ -1,4 +1,4 @@
-package com.taoyyz.framework.web.model.vo;
+package com.taoyyz.framework.web.model.VO;
 
 import lombok.Builder;
 import lombok.Data;
